@@ -1,5 +1,5 @@
 {
-  "name": "react-redux-form",
+  "name": "@kabbi/react-redux-form",
   "version": "1.8.0",
   "description": "Create Forms Easily with React and Redux",
   "main": "lib/index.js",
