@@ -19,24 +19,23 @@ function resolveModel(model, parentModel) {
 
 export default function wrapWithModelResolver(WrappedComponent) {
   class ResolvedModelWrapper extends ReactComponent {
-    constructor(props, context) {
-      super(props, context);
-
-      this.model = context.model;
-      this.store = context.localStore;
-    }
     shouldComponentUpdate(nextProps) {
       return !shallowEqual(this.props, nextProps);
     }
     render() {
+      const {
+        model: parentModel,
+        localStore,
+      } = this.context;
+
       const resolvedModel = resolveModel(
         this.props.model,
-        this.model);
+        parentModel);
 
       return (<WrappedComponent
         {...this.props}
         model={resolvedModel}
-        store={this.store || undefined}
+        store={localStore || undefined}
       />);
     }
   }
