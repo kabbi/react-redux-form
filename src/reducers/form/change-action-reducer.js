@@ -7,6 +7,7 @@ import mapValues from '../../utils/map-values';
 import { createInitialState } from '../form-reducer';
 import initialFieldState from '../../constants/initial-field-state';
 import assocIn from '../../utils/assoc-in';
+import getFormValue from '../../utils/get-form-value';
 import invariant from 'invariant';
 
 function updateFieldValue(field, action, parentModel = undefined) {
@@ -122,24 +123,6 @@ function updateFieldValue(field, action, parentModel = undefined) {
   return i.set(updatedField, '$form', dirtyFormState);
 }
 
-function getFormValue(form) {
-  if (form && !form.$form) {
-    return typeof form.loadedValue !== 'undefined'
-      ? form.loadedValue
-      : form.initialValue;
-  }
-
-  const result = mapValues(form, (field, key) => {
-    if (key === '$form') return undefined;
-
-    return getFormValue(field);
-  });
-
-  delete result.$form;
-
-  return result;
-}
-
 export default function changeActionReducer(state, action, localPath) {
   if (action.type !== actionTypes.CHANGE) return state;
 
@@ -152,9 +135,7 @@ export default function changeActionReducer(state, action, localPath) {
   const updatedState = assocIn(state, localPath, updatedField, (form) => {
     if (!form.$form) return form;
 
-    const formValue = action.state
-      ? get(action.state, form.$form.model)
-      : getFormValue(form);
+    const formValue = getFormValue(form);
 
     const formUpdates = {
       ...form.$form,

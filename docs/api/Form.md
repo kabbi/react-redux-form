@@ -4,9 +4,9 @@ The `<Form>` component is a decorated `<form>` component with a few helpful prop
 
 ```jsx
 import { Form, Control } from 'react-redux-form';
-import { isEmail, isNull } from 'validator';
+import { isEmail, isEmpty } from 'validator';
 
-const required = isNull;
+const required = isEmpty;
 
 const passwordsMatch = ({ password, confirmPassword }) => {
   return password === confirmPassword;
@@ -95,9 +95,11 @@ _(Function)_: The handler function called when the form is submitted. This works
 
 - The submit event's default action is prevented by default, using `event.preventDefault()`.
 - The `onSubmit` handler _will not execute_ if the form is invalid.
-- The `onSubmit` handler receives the form model data, not the event.
+- The `onSubmit` handler receives the form model data as the first argument, and the event as the second argument.
 
-The function passed into `onSubmit={...}` will be called with one argument: the form's model value.
+The function passed into `onSubmit={...}` will be called with two arguments:
+1. the form's model value
+2. the native submit event (if applicable).
 
 ### Example
 ```jsx
@@ -216,18 +218,6 @@ _(Function)_: Calls the callback provided to the `getRef` prop with the node ins
 <Form
   model="user"
   getRef={(node) => this.attach(node)}
-/>
-```
-
-## `getDispatch={(dispatch) => ...}`
-_(Function)_ Provides the dispatcher for the `<Form>`'s store.
-
-(since: 1.4.0)
-
-```jsx
-<Form
-  model="user"
-  getDispatch={(dispatch) => this.formDispatch = dispatch}
 />
 ```
 

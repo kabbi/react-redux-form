@@ -1,8 +1,9 @@
+{% raw %}
 # Frequently Asked Questions
 
 This list will be updated frequently!
 
-### How do you combine the reducer created by react-redux-form and `combineForms` with other reducers?
+### How do I combine the reducer created by react-redux-form and `combineForms` with other reducers?
 
 Use it along side the other reducers and call [combineForms](https://davidkpiano.github.io/react-redux-form/docs/api/combineForms.html) with the second argument set to the reducer key of your choice, `deep` in the following example):
 
@@ -18,7 +19,7 @@ const store = createStore(combineReducers({
 }));
 ```
 
-### How do you add conditional class names based on field state?
+### How do I add conditional class names based on field state?
 
 Use the `mapProps={{...}}` property on `<Control>` components to set any props on the control component based on field state, like this:
 
@@ -46,7 +47,7 @@ as well as other additional props:
 - `onKeyPress`
 - `viewValue`
 
-### How do you validate across fields?
+### How do I validate across fields?
 
 Validation across fields becomes a higher form-level concern, which follows Redux's general tree-structure data flow pattern. If you want a reusable group of fields that are validated, you can **nest forms** as long as you set the form's `component="..."` prop to something other than `"form"` (because you can't nest forms in HTML). [See this issue response for more information.](https://github.com/davidkpiano/react-redux-form/issues/545#issuecomment-261944846) Here's an example:
 
@@ -89,5 +90,86 @@ You can use `getRef` on `<Field>`, `<Control>`, `<Form>`, or `<LocalForm>` compo
 />
 ```
 
+### How do I set up single/multiple-value checkboxes?
+
+For a single checkbox that represents a model's boolean `true` or `false` value, you can use `<Control.checkbox>` as expected:
+
+```jsx
+// if checked, user.hasPets = true, otherwise false.
+<Control.checkbox model="user.hasPets" />
+```
+
+For multiple checkboxes that represent multiple possible values for a model, append `[]` to the control to indicate that it is a multi-value model:
+
+```jsx
+// if dog and cat are checked, model will be:
+// user.pets = ['dog', 'cat']
+<Control.checkbox model="user.pets[]" value="dog" />
+<Control.checkbox model="user.pets[]" value="cat" />
+<Control.checkbox model="user.pets[]" value="goat" />
+```
+
+For single or multiple checkboxes that represent boolean keyed values in a model that's an object, use standard dot notation:
+
+```jsx
+// if dog and cat are checked, model will be
+// user.pets = { dog: true, cat: true, goat: false }
+<Control.checkbox model="user.pets.dog" />
+<Control.checkbox model="user.pets.cat" />
+<Control.checkbox model="user.pets.goat" />
+```
+
+### How do I create a file upload form?
+The second argument of the `<Form onSubmit={(values, event) => ...}>` prop provides the event emitted when the form was submitted. Adapted from the [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/FormData/Using_FormData_Objects):
+
+```jsx
+class UploadForm extends Component {
+  onSubmit = (values, event) => {
+    const formData = new FormData(event.target);
+
+    const request = new XMLHttpRequest();
+    request.open('POST', '/upload', true);
+    request.onload = function(oEvent) {
+      if (request.status == 200) {
+        console.log('Uploaded!');
+      } else {
+        console.log('Error uploading.');
+      }
+    };
+
+    request.send(formData);
+    event.preventDefault();
+  }
+  render() {
+    return (
+      <Form
+        model="user"
+        encType="multipart/form-data"
+        onSubmit={this.onSubmit}
+      >
+        <Control.file model=".avatar" />
+        <button>Upload!</button>
+      </Form>
+    );
+  };
+}
+```
+
+### How do I use HTML5 inputs of other types, such as email and password?
+
+Simply pass the `type="email"` or `type="password"`, etc. type as a prop to `<Control>`:
+
+```jsx
+<Control type="email" />
+<Control type="password" />
+
+// also works
+<Control.text type="email" />
+<Control.text type="password" />
+```
+
+You will also get the native HTML5 constraint validation with these, as if you were using `<input type="email">`.
+
 ### Other Questions and Answers
 - https://github.com/davidkpiano/react-redux-form/issues/675#issuecomment-281164930
+{% endraw %}

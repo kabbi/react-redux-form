@@ -5,11 +5,9 @@ import actions from '../actions';
 function getTextValue(value) {
   if (typeof value === 'string') {
     return `${value}`;
-  } else if (typeof value === 'number') {
-    return value;
   }
 
-  return '';
+  return value;
 }
 
 function isChecked(props) {
@@ -34,15 +32,29 @@ const standardPropsMap = {
 
 const textPropsMap = {
   ...standardPropsMap,
-  value: (props) => ((!props.defaultValue && !props.hasOwnProperty('value'))
-    ? getTextValue(props.viewValue)
-    : props.value),
+  // the value passed into the control is either the original control's
+  // value prop (if the control is controlled) or the value controlled by
+  // <Control>.
+  value: (props) => {
+    if (props.hasOwnProperty('value')) {
+      return props.value;
+    }
+
+    const value = getTextValue(props.viewValue);
+
+    return value === undefined ? '' : value;
+  },
 };
 
 const getModelValue = ({ modelValue }) => modelValue;
 
 const controlPropsMap = {
-  default: textPropsMap,
+  default: {
+    ...standardPropsMap,
+    value: (props) => (props.hasOwnProperty('value')
+      ? props.value
+      : props.viewValue),
+  },
   checkbox: {
     ...standardPropsMap,
     checked: (props) => (props.defaultChecked

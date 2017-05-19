@@ -1,3 +1,4 @@
+{% raw %}
 # Errors Component
 
 ## `<Errors />`
@@ -84,7 +85,7 @@ If the message value is a function, it will be called with the model value.
 
 _(Any)_: The `show` prop determines when error messages should be shown, based on the model's field state (determined by the form reducer).
 
-It can be a boolean, or a function, string, or object as a [Lodash iteratee](https://lodash.com/docs#iteratee). 
+It can be a boolean, or a function, string, or object as a [Lodash iteratee](https://lodash.com/docs#iteratee).
 
 
 ### Examples
@@ -112,10 +113,11 @@ _(String | Function | Element)_: The `wrapper` component, which is the component
 
 _(String | Function | Element)_: The `component`, which is the component for each error message, can be configured using this prop. Default: `"span"`.
 
-### Examples 
+### Examples
 - `component="li"` will wrap all errors in a `<li>`
 - `component={(props) => <div className="error">{props.children}</div>}` will render the error message in the specified functional component, with these props:
   - `modelValue` - the current value of the `model`
   - `fieldValue` - the current field state of the `model`
   - `children` - the error message (text).
 - `component={CustomError}` will wrap the error in a `<CustomError>` component, which will receive the same props as above.
+{% endraw %}

@@ -1,4 +1,5 @@
-import React, { Component, PropTypes } from 'react';
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import getModel from '../utils/get-model';
 import omit from '../utils/omit';
@@ -13,6 +14,7 @@ const propTypes = {
     dispatch: PropTypes.func,
     getState: PropTypes.func,
   }),
+  storeSubscription: PropTypes.any,
 };
 
 class Fieldset extends Component {

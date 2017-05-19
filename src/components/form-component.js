@@ -1,4 +1,5 @@
-import React, { Component, PropTypes } from 'react';
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import shallowEqual from '../utils/shallow-equal';
 import _get from '../utils/get';
@@ -70,6 +71,10 @@ function createFormClass(s = defaultStrategy) {
       this.handleValidSubmit = this.handleValidSubmit.bind(this);
       this.handleInvalidSubmit = this.handleInvalidSubmit.bind(this);
       this.attachNode = this.attachNode.bind(this);
+
+      this.state = {
+        lastSubmitEvent: null,
+      };
     }
 
     getChildContext() {
@@ -98,8 +103,8 @@ function createFormClass(s = defaultStrategy) {
       }
     }
 
-    shouldComponentUpdate(nextProps) {
-      return deepCompareChildren(this, nextProps);
+    shouldComponentUpdate(nextProps, nextState) {
+      return deepCompareChildren(this, nextProps, nextState);
     }
 
     componentDidUpdate(prevProps) {
@@ -151,13 +156,6 @@ function createFormClass(s = defaultStrategy) {
       if (!formValue) return;
 
       if (!validators && !errors && (modelValue !== nextProps.modelValue)) {
-        // If the form is invalid (due to async validity)
-        // but its fields are valid and the value has changed,
-        // the form should be "valid" again.
-        if (!formValue.$form.valid && isValid(formValue, { async: false })) {
-          dispatch(s.actions.setValidity(model, true));
-        }
-
         return;
       }
 
@@ -275,7 +273,7 @@ function createFormClass(s = defaultStrategy) {
       }
     }
 
-    handleValidSubmit() {
+    handleValidSubmit(options) {
       const {
         dispatch,
         model,
@@ -283,19 +281,19 @@ function createFormClass(s = defaultStrategy) {
         onSubmit,
       } = this.props;
 
-      dispatch(s.actions.setPending(model));
+      dispatch(s.actions.setPending(model, true, options));
 
-      if (onSubmit) onSubmit(modelValue);
+      if (onSubmit) onSubmit(modelValue, this.state.lastSubmitEvent);
     }
 
-    handleInvalidSubmit() {
+    handleInvalidSubmit(options) {
       const { onSubmitFailed, formValue, dispatch } = this.props;
 
       if (onSubmitFailed) {
         onSubmitFailed(formValue);
       }
 
-      dispatch(s.actions.setSubmitFailed(this.props.model));
+      dispatch(s.actions.setSubmitFailed(this.props.model, true, options));
     }
 
     handleReset(e) {
@@ -306,20 +304,16 @@ function createFormClass(s = defaultStrategy) {
 
     handleIntents() {
       const {
-        model,
         formValue,
-        dispatch,
       } = this.props;
 
       formValue.$form.intents.forEach((intent) => {
         switch (intent.type) {
           case 'submit': {
-            dispatch(s.actions.clearIntents(model, intent));
-
             if (isValid(formValue, { async: false })) {
-              this.handleValidSubmit();
+              this.handleValidSubmit({ clearIntents: intent });
             } else {
-              this.handleInvalidSubmit();
+              this.handleInvalidSubmit({ clearIntents: intent });
             }
 
             return;
@@ -333,6 +327,7 @@ function createFormClass(s = defaultStrategy) {
 
     handleSubmit(e) {
       if (e && !this.props.action) e.preventDefault();
+      if (e && e.persist) e.persist();
 
       const {
         modelValue,
@@ -349,10 +344,12 @@ function createFormClass(s = defaultStrategy) {
         : true;
 
       if (!validators && onSubmit && formValid) {
-        onSubmit(modelValue);
+        onSubmit(modelValue, e);
 
         return modelValue;
       }
+
+      this.setState({ lastSubmitEvent: e });
 
       this.validate(this.props, false, true);
 

@@ -1,4 +1,5 @@
-import React, { Component, createElement, cloneElement, PropTypes } from 'react';
+import React, { Component, createElement, cloneElement } from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { compose } from 'redux';
 import identity from '../utils/identity';
@@ -12,7 +13,7 @@ import omit from '../utils/omit';
 import actionTypes from '../action-types';
 import debounce from '../utils/debounce';
 
-import getValue from '../utils/get-value';
+import _getValue, { getCheckboxValue } from '../utils/get-value';
 import getValidity from '../utils/get-validity';
 import invertValidity from '../utils/invert-validity';
 import getFieldFromState from '../utils/get-field-from-state';
@@ -33,24 +34,10 @@ const findDOMNode = !isNative
 
 const disallowedProps = ['changeAction', 'getFieldFromState', 'store'];
 
-function getToggleValue(props) {
-  const { modelValue, controlProps } = props;
-
-  switch (controlProps.type) {
-    case 'checkbox':
-      return typeof controlProps.value !== 'undefined'
-        ? controlProps.value
-        : !modelValue; // simple checkbox
-
-    case 'radio':
-    default:
-      return controlProps.value;
-  }
-}
-
-function mergeOrSetErrors(model, errors) {
+function mergeOrSetErrors(model, errors, options) {
   return actions.setErrors(model, errors, {
     merge: isPlainObject(errors),
+    ...options,
   });
 }
 
@@ -61,6 +48,7 @@ const propTypes = {
   ]).isRequired,
   modelValue: PropTypes.any,
   viewValue: PropTypes.any,
+  defaultValue: PropTypes.any,
   control: PropTypes.any,
   onLoad: PropTypes.func,
   onSubmit: PropTypes.func,
@@ -112,6 +100,8 @@ const propTypes = {
   withField: PropTypes.bool,
   debounce: PropTypes.number,
   persist: PropTypes.bool,
+  getValue: PropTypes.func,
+  isToggle: PropTypes.bool,
 };
 
 const defaultStrategy = {
@@ -122,6 +112,7 @@ const defaultStrategy = {
 
 function createControlClass(s = defaultStrategy) {
   const emptyControlProps = {};
+  const emptyMapProps = {};
 
   class Control extends Component {
     constructor(props) {
@@ -214,25 +205,20 @@ function createControlClass(s = defaultStrategy) {
 
           return value;
         });
+      } else if (typeof mapProps === 'function') {
+        return mapProps(originalProps);
       }
 
-      return mapProps(originalProps);
+      return emptyMapProps;
     }
 
     getChangeAction(event) {
-      const {
-        model,
-        modelValue,
-        changeAction,
-      } = this.props;
-      const value = this.isToggle()
-        ? getToggleValue(this.props)
-        : event;
-
-      return changeAction(model, getValue(value), {
-        currentValue: modelValue,
-        external: false,
-      });
+      return this.props.changeAction(
+        this.props.model,
+        this.getValue(event), {
+          currentValue: this.props.modelValue,
+          external: false,
+        });
     }
 
     getValidateAction(value, eventName) {
@@ -245,7 +231,7 @@ function createControlClass(s = defaultStrategy) {
         fieldValue,
       } = this.props;
 
-      if (!validators && !errors) return false;
+      if (!validators && !errors && !this.willValidate) return false;
 
       const nodeErrors = this.getNodeErrors();
 
@@ -282,6 +268,7 @@ function createControlClass(s = defaultStrategy) {
         modelValue,
         updateOn,
         dispatch,
+        getValue,
       } = this.props;
 
       // If there are no async validators,
@@ -326,7 +313,7 @@ function createControlClass(s = defaultStrategy) {
         props: { fieldValue },
       } = this;
 
-      if (!node || !node.willValidate) {
+      if (!node || (node && !node.willValidate)) {
         this.willValidate = false;
         return null;
       }
@@ -351,15 +338,13 @@ function createControlClass(s = defaultStrategy) {
     }
 
     setViewValue(viewValue) {
-      if (!this.isToggle()) {
+      if (!this.props.isToggle) {
         this.setState({ viewValue: this.parse(viewValue) });
       }
     }
 
-    isToggle() {
-      const { component, controlProps } = this.props;
-
-      return component === 'input' && ~['radio', 'checkbox'].indexOf(controlProps.type);
+    getValue(event) {
+      return this.props.getValue(event, this.props);
     }
 
     handleIntents() {
@@ -385,7 +370,7 @@ function createControlClass(s = defaultStrategy) {
 
             if ((focused && this.node.focus)
               && (
-                !this.isToggle()
+                !this.props.isToggle
                 || typeof intent.value === 'undefined'
                 || intent.value === controlProps.value
               )) {
@@ -398,15 +383,13 @@ function createControlClass(s = defaultStrategy) {
           }
           case 'validate':
             if (containsEvent(validateOn, 'change')) {
-              dispatch(actions.clearIntents(model, intent));
-              this.validate();
+              this.validate({ clearIntents: intent });
             }
             return;
 
           case 'load':
             if (!shallowEqual(modelValue, fieldValue.value)) {
-              dispatch(actions.clearIntents(model, intent));
-              dispatch(actions.load(model, fieldValue.value));
+              dispatch(actions.load(model, fieldValue.value, { clearIntents: intent }));
             }
             return;
 
@@ -425,7 +408,7 @@ function createControlClass(s = defaultStrategy) {
     handleChange(event) {
       if (event && event.persist) event.persist();
 
-      this.setViewValue(getValue(event));
+      this.setViewValue(this.getValue(event));
       this.handleUpdate(event);
     }
 
@@ -433,7 +416,10 @@ function createControlClass(s = defaultStrategy) {
       const {
         controlProps: { onKeyPress },
         dispatch,
+        getValue,
       } = this.props;
+
+      if (onKeyPress) onKeyPress(event);
 
       // Get the value from the event
       // in case updateOn="blur" (or something other than "change")
@@ -442,8 +428,6 @@ function createControlClass(s = defaultStrategy) {
       if (event.key === 'Enter') {
         dispatch(this.getChangeAction(parsedValue));
       }
-
-      if (onKeyPress) onKeyPress(event);
     }
 
     handleLoad() {
@@ -463,6 +447,8 @@ function createControlClass(s = defaultStrategy) {
         defaultValue = controlProps.defaultValue;
       } else if (controlProps.hasOwnProperty('defaultChecked')) {
         defaultValue = controlProps.defaultChecked;
+      } else if (this.props.hasOwnProperty('defaultValue')) {
+        defaultValue = this.props.defaultValue;
       }
 
       const loadActions = [this.getValidateAction(defaultValue)];
@@ -533,7 +519,7 @@ function createControlClass(s = defaultStrategy) {
             : event;
         }
 
-        if (this.isToggle()) {
+        if (this.props.isToggle) {
           return compose(
             dispatchBatchActions,
             persistEventWithCallback(controlEventHandler || identity)
@@ -551,7 +537,7 @@ function createControlClass(s = defaultStrategy) {
           },
           dispatchBatchActions,
           parser,
-          getValue,
+          (e) => this.getValue(e),
           persistEventWithCallback(controlEventHandler || identity)
         )(event, withField ? fieldValue : undefined);
       };
@@ -560,10 +546,13 @@ function createControlClass(s = defaultStrategy) {
     attachNode() {
       const node = findDOMNode && findDOMNode(this);
 
-      if (node) this.node = node;
+      if (node) {
+        this.node = node;
+        this.willValidate = node.willValidate;
+      }
     }
 
-    validate() {
+    validate(options) {
       const {
         model,
         modelValue,
@@ -584,7 +573,9 @@ function createControlClass(s = defaultStrategy) {
         : fieldErrors;
 
       if (!shallowEqual(errors, fieldValue.errors)) {
-        dispatch(mergeOrSetErrors(model, errors));
+        dispatch(mergeOrSetErrors(model, errors, options));
+      } else if (options.clearIntents) {
+        dispatch(actions.clearIntents(model, options.clearIntents));
       }
 
       return modelValue;
@@ -633,10 +624,11 @@ function createControlClass(s = defaultStrategy) {
     controlProps: emptyControlProps,
     ignore: [],
     dynamic: false,
-    mapProps: controlPropsMap.default,
     component: 'input',
     withField: true,
     persist: false,
+    getValue: _getValue,
+    isToggle: false,
   };
 
   function mapStateToProps(state, props) {
@@ -662,123 +654,205 @@ function createControlClass(s = defaultStrategy) {
     };
   }
 
-  const ConnectedControl = resolveModel(connect(mapStateToProps)(Control));
+  const ConnectedControl = resolveModel(connect(mapStateToProps, null, null, {
+    areOwnPropsEqual(ownProps, nextOwnProps) {
+      return shallowEqual(ownProps, nextOwnProps, {
+        omitKeys: ['mapProps'],
+      });
+    },
+    areStatePropsEqual(stateProps, nextStateProps) {
+      return shallowEqual(stateProps, nextStateProps, {
+        deepKeys: ['controlProps'],
+      });
+    },
+  })(Control), ['controlProps'], ['mapProps']);
 
   /* eslint-disable react/prop-types */
-  const DefaultConnectedControl = (props) => (
-    <ConnectedControl
-      mapProps={{
-        ...controlPropsMap.default,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  /* eslint-disable react/no-multi-comp */
+  class DefaultConnectedControl extends React.Component {
+    shouldComponentUpdate(nextProps) {
+      return !shallowEqual(this.props, nextProps, {
+        deepKeys: ['controlProps'],
+        omitKeys: ['mapProps'],
+      });
+    }
 
-  DefaultConnectedControl.input = (props) => (
-    <ConnectedControl
-      component="input"
-      mapProps={{
-        ...controlPropsMap.default,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+    render() {
+      return (
+        <ConnectedControl
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.default,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
 
-  DefaultConnectedControl.text = (props) => (
-    <ConnectedControl
-      component="input"
-      mapProps={{
-        ...controlPropsMap.text,
-        type: 'text',
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  DefaultConnectedControl.custom = ConnectedControl;
 
-  DefaultConnectedControl.textarea = (props) => (
-    <ConnectedControl
-      component="textarea"
-      mapProps={{
-        ...controlPropsMap.textarea,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  class DefaultConnectedControlInput extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="input"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.default,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
 
-  DefaultConnectedControl.radio = (props) => (
-    <ConnectedControl
-      component="input"
-      type="radio"
-      mapProps={{
-        ...controlPropsMap.radio,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  DefaultConnectedControl.input = DefaultConnectedControlInput;
 
-  DefaultConnectedControl.checkbox = (props) => (
-    <ConnectedControl
-      component="input"
-      type="checkbox"
-      mapProps={{
-        ...controlPropsMap.checkbox,
-        ...props.mapProps,
-      }}
-      changeAction={props.changeAction || s.actions.checkWithValue}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  class DefaultConnectedControlText extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="input"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.text,
+            type: 'text',
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
 
-  DefaultConnectedControl.file = (props) => (
-    <ConnectedControl
-      component="input"
-      type="file"
-      mapProps={{
-        ...controlPropsMap.file,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  DefaultConnectedControl.text = DefaultConnectedControlText;
 
-  DefaultConnectedControl.select = (props) => (
-    <ConnectedControl
-      component="select"
-      mapProps={{
-        ...controlPropsMap.select,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  class DefaultConnectedControlTextArea extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="textarea"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.textarea,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
 
-  DefaultConnectedControl.button = (props) => (
-    <ConnectedControl
-      component="button"
-      mapProps={{
-        ...controlPropsMap.button,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  DefaultConnectedControl.textarea = DefaultConnectedControlTextArea;
 
-  DefaultConnectedControl.reset = (props) => (
-    <ConnectedControl
-      component="button"
-      type="reset"
-      mapProps={{
-        ...controlPropsMap.reset,
-        ...props.mapProps,
-      }}
-      {...omit(props, 'mapProps')}
-    />
-  );
+  class DefaultConnectedControlRadio extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="input"
+          type="radio"
+          isToggle
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.radio,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.radio = DefaultConnectedControlRadio;
+
+  class DefaultConnectedControlCheckbox extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="input"
+          type="checkbox"
+          isToggle
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.checkbox,
+            ...this.props.mapProps,
+          }}
+          getValue={getCheckboxValue}
+          changeAction={this.props.changeAction || s.actions.checkWithValue}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.checkbox = DefaultConnectedControlCheckbox;
+
+  class DefaultConnectedControlFile extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="input"
+          type="file"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.file,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.file = DefaultConnectedControlFile;
+
+  class DefaultConnectedControlSelect extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="select"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.select,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.select = DefaultConnectedControlSelect;
+
+  class DefaultConnectedControlButton extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="button"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.button,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.button = DefaultConnectedControlButton;
+
+  class DefaultConnectedControlReset extends DefaultConnectedControl {
+    render() {
+      return (
+        <ConnectedControl
+          component="button"
+          type="reset"
+          {...this.props}
+          mapProps={{
+            ...controlPropsMap.reset,
+            ...this.props.mapProps,
+          }}
+        />
+      );
+    }
+  }
+
+  DefaultConnectedControl.reset = DefaultConnectedControlReset;
 
   return DefaultConnectedControl;
 }

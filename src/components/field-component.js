@@ -1,5 +1,5 @@
-import React, { Component, PropTypes } from 'react';
-
+import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import _get from '../utils/get';
 import identity from '../utils/identity';
 import omit from '../utils/omit';
@@ -16,6 +16,7 @@ import shallowCompareWithoutChildren from '../utils/shallow-compare-without-chil
 import getModel from '../utils/get-model';
 import getFieldFromState from '../utils/get-field-from-state';
 import resolveModel from '../utils/resolve-model';
+import { getCheckboxValue } from '../utils/get-value';
 import initialFieldState from '../constants/initial-field-state';
 
 const fieldPropTypes = {
@@ -138,15 +139,20 @@ function createFieldClass(customControlPropsMap = {}, s = defaultStrategy) {
   const defaultControlPropsMap = {
     checkbox: {
       changeAction: s.actions.checkWithValue,
+      getValue: getCheckboxValue,
+      isToggle: true,
+    },
+    radio: {
+      isToggle: true,
     },
   };
 
   class Field extends Component {
-    shouldComponentUpdate(nextProps) {
+    shouldComponentUpdate(nextProps, nextState) {
       const { dynamic } = this.props;
 
       if (dynamic) {
-        return deepCompareChildren(this, nextProps);
+        return deepCompareChildren(this, nextProps, nextState);
       }
 
       return shallowCompareWithoutChildren(this, nextProps);

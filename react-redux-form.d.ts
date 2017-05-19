@@ -213,6 +213,7 @@ export interface ControlProps<T> extends React.HTMLProps<T> {
 }
 
 export class Control<T> extends React.Component<ControlProps<T>, {}> {
+    static custom: React.ComponentClass<ControlProps<HTMLInputElement>>;
     static input: React.ComponentClass<ControlProps<HTMLInputElement>>;
     static text: React.ComponentClass<ControlProps<HTMLInputElement>>;
     static textarea: React.ComponentClass<ControlProps<HTMLTextAreaElement>>;
@@ -316,13 +317,13 @@ interface BaseFormProps {
      * The handler function called when the form is submitted. This works almost exactly like a normal <form onSubmit={...}> handler, with a few differences:
      * * The submit event's default action is prevented by default, using event.preventDefault().
      * * The onSubmit handler will not execute if the form is invalid.
-     * * The onSubmit handler receives the form model data, not the event.
+     * * The onSubmit handler receives the form model data as the first argument, and the event as the second argument.
      *
      * Tips:
      * * You can do anything in onSubmit; including firing off custom actions or handling (async) validation yourself.
      * @param formModelData The form's model data
      */
-    onSubmit?: (formModelData: any) => void;
+    onSubmit?: (formModelData: any, event?: Event) => void;
     /**
      * The handler function called when the form fails to submit. This happens when:
      * * attempting to submit an invalid form
@@ -694,6 +695,10 @@ interface ValidityOptions {
     errors?: boolean;
 }
 
+interface SetErrorsOptions {
+    async?: boolean;
+}
+
 interface Actions {
     /* ------ ------ ------ ------ */
     /* ------ Model Actions ------ */
@@ -960,8 +965,9 @@ interface Actions {
      * This action allows you to set the errors for multiple submodels of a model at the same time. Similar to setFieldsValidity but for errors
      * @param model The top level form model
      * @param fieldsErrors An object where the keys are field paths and the value is error object
+     * @param options { async: true } if the error is an error from async validation.
      */
-    setFieldsErrors: (model: string, fieldsErrors: FieldsObject<ErrorsObject | boolean | string>) => FieldAction;
+    setFieldsErrors: (model: string, fieldsErrors: FieldsObject<ErrorsObject | boolean | string>, options?: SetErrorsOptions) => FieldAction;
 
 
 
@@ -989,8 +995,9 @@ interface Actions {
      *
      * @param model
      * @param errors A truthy/falsey value, a string error message, or an object indicating which error keys of the field model are invalid via booleans (where true is invalid) or strings (set specific error messages, not advised).
+     * @param options { async: true } if the error is an error from async validation.
      */
-    setErrors: (model: string, errors: boolean | string | ErrorsObject) => FieldAction;
+    setErrors: (model: string, errors: boolean | string | ErrorsObject, options?: SetErrorsOptions) => FieldAction;
 
     /**
      * Returns an action thunk that calculates the errors of the model based on the function/object errorValidators. Then, the thunk dispatches actions.setErrors(model, errors).

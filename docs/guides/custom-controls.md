@@ -14,7 +14,7 @@ import CustomInput from '../path/to/custom-input-component';
 class MyCustomInput extends React.Component {
   render() {
     const { model, dispatch } = this.props;
-    
+
     return (
       <CustomInput
         onCustomChange={e => dispatch(actions.change(model, e))}
@@ -31,7 +31,7 @@ class MyCustomInput extends React.Component {
 
 However, this can get a bit tedious, especially for complex controls. Thankfully, there's an easier way.
 
-## Custom Controls with `<Control>`
+## Standard Custom Controls with `<Control>`
 
 With the `<Control>` component, a custom component can be passed into the `component={...}` prop, and standard control props and event handlers (such as `onChange`, `onBlur`, `onFocus`, `value`, etc.) will be mapped as expected:
 
@@ -80,6 +80,21 @@ By default, any props on `<Control>` that are _not_ part of the `Control.propTyp
   component={MyCheckbox}
   controlProps={{
     label: 'Is user active?', // will also be passed to MyCheckbox
+  }}
+/>
+```
+
+## Special Custom Controls with `<Control.custom>`
+
+If you do _not_ want any standard property mappings (such as `onChange`, `onBlur`, etc.) passed down to your custom control component, use `<Control.custom>` and define your own mappings:
+
+```jsx
+<Control.custom
+  component={SpecialCustomText}
+  mapProps={{
+    onTextChange: (props) => props.onChange,
+    onLoseFocus: (props) => props.onBlur,
+    // etc.
   }}
 />
 ```
@@ -137,5 +152,20 @@ Some custom controls won't have prop keys that match up exactly with the standar
 />
 ```
 
-In `mapProps`, the **key** corresponds to the _custom_ control's prop key, and the **value** is a function that takes in the standard `props` applied to `<Control>` and returns the prop value that the custom prop should map to.
+If `mapProps` is an object, the **key** corresponds to the _custom_ control's prop key, and the **value** is a function that takes in the standard `props` applied to `<Control>` and returns the prop value that the custom prop should map to.
 
+
+```jsx
+<Control
+  model="..."
+  component={DatePickerIOS}
+  mapProps={ ({modelValue, onChange}) => {
+    return {
+      date: modelValue,
+      onDateChange: onChange,
+    };
+  }}
+/>
+```
+
+If `mapProps` is a function, it is applied to the standard `props`, and its return value is used as _custom_ control's props.
