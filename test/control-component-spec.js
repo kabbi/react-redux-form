@@ -1290,13 +1290,12 @@ Object.keys(testContexts).forEach((testKey) => {
     });
 
     describe('change on enter', () => {
-      const reducer = modelReducer('test');
-      const store = testCreateStore({
-        test: reducer,
-        testForm: formReducer('test'),
-      });
-
       it('should change the model upon pressing Enter', () => {
+        const reducer = modelReducer('test');
+        const store = testCreateStore({
+          test: reducer,
+          testForm: formReducer('test'),
+        });
         const field = TestUtils.renderIntoDocument(
           <Provider store={store}>
             <Control.text
@@ -1319,6 +1318,45 @@ Object.keys(testContexts).forEach((testKey) => {
         assert.equal(
           get(store.getState().test, 'foo'),
           'testing');
+      });
+
+      it('should validate the model upon pressing Enter', () => {
+        const reducer = modelReducer('test');
+        const store = testCreateStore({
+          test: reducer,
+          testForm: formReducer('test'),
+        });
+        const field = TestUtils.renderIntoDocument(
+          <Provider store={store}>
+            <Control.text
+              model="test.foo"
+              updateOn="blur"
+              validators={{
+                isNotBar: v => v !== 'bar',
+              }}
+            />
+          </Provider>
+        );
+
+        const control = TestUtils.findRenderedDOMComponentWithTag(field, 'input');
+
+        control.value = 'bar';
+
+        TestUtils.Simulate.keyPress(control, {
+          key: 'Enter',
+          keyCode: 13,
+          which: 13,
+        });
+
+        assert.equal(
+          get(store.getState().test, 'foo'),
+          'bar');
+
+        assert.deepEqual(
+          store.getState().testForm.foo.errors,
+          { isNotBar: true });
+
+        assert.isFalse(store.getState().testForm.foo.valid);
       });
     });
 
@@ -1947,6 +1985,35 @@ Object.keys(testContexts).forEach((testKey) => {
         TestUtils.Simulate.change(input);
 
         assert.equal(get(store.getState().test, 'foo'), 'bar');
+        assert.equal(input.value, 'debounced');
+      });
+
+      it('should flush debounced changes when control is unmounted', () => {
+        const initialState = getInitialState({ foo: 'bar' });
+        const store = testCreateStore({
+          test: modelReducer('test', initialState),
+          testForm: formReducer('test', initialState),
+        });
+
+        const container = document.createElement('div');
+
+        const control = ReactDOM.render(
+          <Provider store={store}>
+            <Control.text
+              model="test.foo"
+              debounce={1000}
+            />
+          </Provider>,
+        container);
+
+        const input = TestUtils.findRenderedDOMComponentWithTag(control, 'input');
+        input.value = 'debounced';
+
+        TestUtils.Simulate.change(input);
+
+        ReactDOM.unmountComponentAtNode(container);
+
+        assert.equal(get(store.getState().test, 'foo'), 'debounced');
         assert.equal(input.value, 'debounced');
       });
     });
