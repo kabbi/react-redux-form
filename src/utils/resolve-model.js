@@ -20,8 +20,8 @@ function resolveModel(model, parentModel) {
 
 export default function wrapWithModelResolver(WrappedComponent, deepKeys = [], omitKeys = []) {
   class ResolvedModelWrapper extends ReactComponent {
-    shouldComponentUpdate(nextProps) {
-      return !shallowEqual(this.props, nextProps, {
+    shouldComponentUpdate(nextProps, nextState, nextContext) {
+      return !shallowEqual(this.context, nextContext) || !shallowEqual(this.props, nextProps, {
         deepKeys,
         omitKeys,
       });
